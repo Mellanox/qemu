@@ -32,6 +32,7 @@
 #include <arpa/inet.h>
 #include <rdma/rdma_cma.h>
 #include "trace.h"
+#include "qemu/iov.h"
 
 /*
  * Print and error on both the Monitor and the Log file.
@@ -53,18 +54,19 @@
 #define RDMA_REG_CHUNK_SHIFT 20 /* 1 MB */
 
 /*
+ * Maximum size infiniband SEND message
+ */
+#define RDMA_CONTROL_MAX_BUFFER (512 * 1024)
+#define RDMA_CONTROL_MAX_COMMANDS_PER_MESSAGE 4096
+
+/*
  * This is only for non-live state being migrated.
  * Instead of RDMA_WRITE messages, we use RDMA_SEND
  * messages for that state, which requires a different
  * delivery design than main memory.
  */
-#define RDMA_SEND_INCREMENT 32768
-
-/*
- * Maximum size infiniband SEND message
- */
-#define RDMA_CONTROL_MAX_BUFFER (512 * 1024)
-#define RDMA_CONTROL_MAX_COMMANDS_PER_MESSAGE 4096
+#define RDMA_SEND_INCREMENT (RDMA_CONTROL_MAX_BUFFER \
+                             - sizeof(RDMAControlHeader))
 
 #define RDMA_CONTROL_VERSION_CURRENT 1
 /*
@@ -2664,8 +2666,8 @@ static ssize_t qio_channel_rdma_writev(QIOChannel *ioc,
     RDMAContext *rdma;
     int ret;
     ssize_t done = 0;
-    size_t i;
     size_t len = 0;
+    uint8_t *buf;
 
     rcu_read_lock();
     rdma = atomic_rcu_read(&rioc->rdmaout);
@@ -2688,28 +2690,25 @@ static ssize_t qio_channel_rdma_writev(QIOChannel *ioc,
         return ret;
     }
 
-    for (i = 0; i < niov; i++) {
-        size_t remaining = iov[i].iov_len;
-        uint8_t * data = (void *)iov[i].iov_base;
-        while (remaining) {
-            RDMAControlHeader head;
+    /* avoid memcpy twice */
+    buf = rdma->wr_data[RDMA_WRID_CONTROL].control + sizeof(RDMAControlHeader);
+    while (done < iov_size(iov, niov)) {
+        len = iov_to_buf(iov, niov, done, buf, RDMA_SEND_INCREMENT);
+        if (!len) {
+            break;
+        }
+        done += len;
 
-            len = MIN(remaining, RDMA_SEND_INCREMENT);
-            remaining -= len;
+        RDMAControlHeader head;
+        head.len = len;
+        head.type = RDMA_CONTROL_QEMU_FILE;
+        head.repeat = 1;
 
-            head.len = len;
-            head.type = RDMA_CONTROL_QEMU_FILE;
+        ret = qemu_rdma_exchange_send(rdma, &head, NULL, NULL, NULL, NULL);
 
-            ret = qemu_rdma_exchange_send(rdma, &head, data, NULL, NULL, NULL);
-
-            if (ret < 0) {
-                rdma->error_state = ret;
-                rcu_read_unlock();
-                return ret;
-            }
-
-            data += len;
-            done += len;
+        if (ret < 0) {
+            rdma->error_state = ret;
+            return ret;
         }
     }
 
