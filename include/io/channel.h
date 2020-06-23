@@ -104,6 +104,7 @@ struct QIOChannelClass {
                          int *fds,
                          size_t nfds,
                          Error **errp);
+    int (*io_peek)(QIOChannel *ioc, Error **errp);
     ssize_t (*io_readv)(QIOChannel *ioc,
                         const struct iovec *iov,
                         size_t niov,

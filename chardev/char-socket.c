@@ -558,6 +558,14 @@ static gboolean tcp_chr_hup(QIOChannel *channel,
     return G_SOURCE_REMOVE;
 }
 
+static int tcp_chr_peek(Chardev *chr)
+{
+    SocketChardev *s = SOCKET_CHARDEV(chr);
+    QIOChannelClass *klass = QIO_CHANNEL_GET_CLASS(s->ioc);
+
+    return klass->io_peek(s->ioc, NULL);
+}
+
 static int tcp_chr_sync_read(Chardev *chr, const uint8_t *buf, int len)
 {
     SocketChardev *s = SOCKET_CHARDEV(chr);
@@ -1509,6 +1517,7 @@ static void char_socket_class_init(ObjectClass *oc, void *data)
     cc->open = qmp_chardev_open_socket;
     cc->chr_wait_connected = tcp_chr_wait_connected;
     cc->chr_write = tcp_chr_write;
+    cc->chr_peek = tcp_chr_peek;
     cc->chr_sync_read = tcp_chr_sync_read;
     cc->chr_disconnect = tcp_chr_disconnect;
     cc->get_msgfds = tcp_get_msgfds;

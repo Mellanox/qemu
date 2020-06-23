@@ -27,6 +27,8 @@
 #include "trace.h"
 #include "qapi/clone-visitor.h"
 
+#include <sys/ioctl.h>
+
 #define SOCKET_MAX_FDS 16
 
 SocketAddress *
@@ -471,6 +473,20 @@ static void qio_channel_socket_copy_fds(struct msghdr *msg,
     }
 }
 
+static int qio_channel_socket_peek(QIOChannel *ioc, Error **errp)
+{
+    QIOChannelSocket *sioc = QIO_CHANNEL_SOCKET(ioc);
+    int ret;
+    int bytes;
+
+    ret = ioctl(sioc->fd, FIONREAD, &bytes);
+    if (ret < 0) {
+        error_setg_errno(errp, errno, "Unable to peek from socket");
+        return -1;
+    }
+
+    return bytes;
+}
 
 static ssize_t qio_channel_socket_readv(QIOChannel *ioc,
                                         const struct iovec *iov,
@@ -779,6 +795,7 @@ static void qio_channel_socket_class_init(ObjectClass *klass,
     QIOChannelClass *ioc_klass = QIO_CHANNEL_CLASS(klass);
 
     ioc_klass->io_writev = qio_channel_socket_writev;
+    ioc_klass->io_peek = qio_channel_socket_peek;
     ioc_klass->io_readv = qio_channel_socket_readv;
     ioc_klass->io_set_blocking = qio_channel_socket_set_blocking;
     ioc_klass->io_close = qio_channel_socket_close;
