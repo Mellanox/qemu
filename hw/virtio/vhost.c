@@ -49,6 +49,17 @@ static unsigned int used_memslots;
 static QLIST_HEAD(, vhost_dev) vhost_devices =
     QLIST_HEAD_INITIALIZER(vhost_devices);
 
+int vhost_for_each_device(vhost_dev_cb cb)
+{
+    struct vhost_dev *hdev;
+    int result = 0;
+
+    QLIST_FOREACH(hdev, &vhost_devices, entry) {
+        result = cb(hdev);
+    }
+    return result;
+}
+
 bool vhost_has_free_slot(void)
 {
     unsigned int slots_limit = ~0U;

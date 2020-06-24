@@ -264,6 +264,46 @@ struct scrub_regions {
     int fd_idx;
 };
 
+static void slave_read(void *opaque);
+
+static int vhost_dev_slave_read(struct vhost_dev *dev) {
+    struct vhost_user *u = dev->opaque;
+    int bytes = 0;
+    int r;
+
+    if (u->slave_fd < 0)
+        return 0;
+    r = ioctl(u->slave_fd, FIONREAD, &bytes);
+    if (r)  {
+        error_report("Failed to read client msg bytes %d", r);
+    } else if (bytes) {
+        /* Client message available */
+        slave_read(dev);
+    }
+    return 1;
+}
+
+static int vhost_user_progress_slave(struct vhost_user *u) {
+    CharBackend *chr = u->user->chr;
+    int r;
+
+    while (1) {
+        /* get available bytes ready to read */
+        r = CHARDEV_GET_CLASS(chr->chr)->chr_peek(chr->chr);
+        if (r < 0) {
+            error_report("Failed to read msg bytes %d", r);
+            return -1;
+        } else if (r) { /* master message available */
+            return 0;
+        }
+        /* no message, peek client message */
+        if (vhost_for_each_device(vhost_dev_slave_read))
+            continue; /* got slave message, no sleep */
+        g_usleep(100);
+    }
+    return 0;
+}
+
 static bool ioeventfd_enabled(void)
 {
     return !kvm_enabled() || kvm_eventfds_enabled();
@@ -275,6 +315,10 @@ static int vhost_user_read_header(struct vhost_dev *dev, VhostUserMsg *msg)
     CharBackend *chr = u->user->chr;
     uint8_t *p = (uint8_t *) msg;
     int r, size = VHOST_USER_HDR_SIZE;
+
+    /* progress vhost_user client to send slave message to avoid stuck */
+    if (vhost_user_progress_slave(u))
+        return -1;
 
     r = qemu_chr_fe_read_all(chr, p, size);
     if (r != size) {
