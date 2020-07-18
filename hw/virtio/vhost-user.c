@@ -1135,8 +1135,17 @@ static int vhost_user_get_vring_base(struct vhost_dev *dev,
         .payload.state = *ring,
         .hdr.size = sizeof(msg.payload.state),
     };
+    struct vhost_user *u = dev->opaque;
+    VhostUserState *user = u->user;
 
     vhost_user_host_notifier_remove(dev, ring->index);
+
+    /* For server mode, free mmap notifier from client */
+	if (user->notifier[ring->index].addr) {
+		object_unparent(OBJECT(&user->notifier[ring->index].mr));
+		munmap(user->notifier[ring->index].addr, qemu_real_host_page_size);
+		user->notifier[ring->index].addr = NULL;
+	}
 
     if (vhost_user_write(dev, &msg, NULL, 0) < 0) {
         return -1;
