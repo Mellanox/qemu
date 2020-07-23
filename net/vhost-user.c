@@ -233,11 +233,8 @@ static void chr_closed_bh(void *opaque)
                                           MAX_QUEUE_NUM);
     assert(queues < MAX_QUEUE_NUM);
 
-    s = DO_UPCAST(NetVhostUserState, nc, ncs[0]);
-
-    for (i = queues -1; i >= 0; i--) {
+    for (i = 0; i < queues; i++) {
         s = DO_UPCAST(NetVhostUserState, nc, ncs[i]);
-
         if (s->vhost_net) {
             s->acked_features = vhost_net_get_acked_features(s->vhost_net);
         }
@@ -245,8 +242,11 @@ static void chr_closed_bh(void *opaque)
 
     qmp_set_link(name, false, &err);
 
-    qemu_chr_fe_set_handlers(&s->chr, NULL, NULL, net_vhost_user_event,
-                             NULL, opaque, NULL, true);
+    for (i = 0; i < queues; i++) {
+        s = DO_UPCAST(NetVhostUserState, nc, ncs[i]);
+        qemu_chr_fe_set_handlers(&s->chr, NULL, NULL, net_vhost_user_event,
+                                 NULL, opaque, NULL, true);
+    }
 
     if (err) {
         error_report_err(err);
