@@ -297,6 +297,8 @@ int vhost_net_start(VirtIODevice *dev, NetClientState *ncs,
     VirtioBusState *vbus = VIRTIO_BUS(qbus);
     VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(vbus);
     int r, e, i;
+    struct vhost_net *net = NULL;
+    uint64_t features;
 
     if (!k->set_guest_notifiers) {
         error_report("binding does not support guest notifiers");
@@ -304,8 +306,6 @@ int vhost_net_start(VirtIODevice *dev, NetClientState *ncs,
     }
 
     for (i = 0; i < total_queues; i++) {
-        struct vhost_net *net;
-
         net = get_vhost_net(ncs[i].peer);
         vhost_net_set_vq_index(net, i * 2);
 
@@ -325,7 +325,8 @@ int vhost_net_start(VirtIODevice *dev, NetClientState *ncs,
     }
 
     for (i = 0; i < total_queues; i++) {
-        r = vhost_net_start_one(get_vhost_net(ncs[i].peer), dev);
+        net = get_vhost_net(ncs[i].peer);
+        r = vhost_net_start_one(net, dev);
 
         if (r < 0) {
             goto err_start;
@@ -339,6 +340,9 @@ int vhost_net_start(VirtIODevice *dev, NetClientState *ncs,
                 goto err_start;
             }
         }
+
+        /* send vhost message to progress client message handling */
+        net->dev.vhost_ops->vhost_get_features(&net->dev, &features);
     }
 
     return 0;
