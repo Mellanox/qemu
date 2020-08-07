@@ -4036,9 +4036,14 @@ static int monitor_can_read(void *opaque)
 static void monitor_qmp_respond(Monitor *mon, QObject *rsp,
                                 Error *err, QObject *id)
 {
+    QDict *qdict = NULL;
+
     if (err) {
         assert(!rsp);
-        rsp = QOBJECT(qmp_error_response(err));
+        qdict = qdict_new();
+        qdict_put_obj(qdict, "error", qmp_build_error_object(err));
+        error_free(err);
+        rsp = QOBJECT(qdict);
     }
 
     if (rsp) {
