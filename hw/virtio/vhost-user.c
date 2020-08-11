@@ -271,6 +271,8 @@ static int vhost_dev_slave_read(struct vhost_dev *dev) {
     int bytes = 0;
     int r;
 
+    if (dev->vhost_ops->backend_type != VHOST_BACKEND_TYPE_USER)
+        return 0;
     if (u->slave_fd < 0)
         return 0;
     r = ioctl(u->slave_fd, FIONREAD, &bytes);
