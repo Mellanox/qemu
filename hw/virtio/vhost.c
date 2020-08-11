@@ -52,10 +52,12 @@ static QLIST_HEAD(, vhost_dev) vhost_devices =
 int vhost_for_each_device(vhost_dev_cb cb)
 {
     struct vhost_dev *hdev;
-    int result = 0;
+    int result = 0, ret;
 
     QLIST_FOREACH(hdev, &vhost_devices, entry) {
-        result = cb(hdev);
+        ret = cb(hdev);
+        if (ret > 0)
+            result += ret;
     }
     return result;
 }

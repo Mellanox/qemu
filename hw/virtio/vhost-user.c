@@ -276,11 +276,16 @@ static int vhost_dev_slave_read(struct vhost_dev *dev) {
     r = ioctl(u->slave_fd, FIONREAD, &bytes);
     if (r)  {
         error_report("Failed to read client msg bytes %d", r);
+        return -1;
     } else if (bytes) {
         /* Client message available */
+        qemu_set_fd_handler(u->slave_fd, NULL, NULL, NULL);
         slave_read(dev);
+        qemu_set_fd_handler(u->slave_fd, slave_read, NULL, dev);
+        return 1;
+    } else {
+        return 0;
     }
-    return 1;
 }
 
 static int vhost_user_progress_slave(struct vhost_user *u) {
