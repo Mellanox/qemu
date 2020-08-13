@@ -293,6 +293,7 @@ static int vhost_dev_slave_read(struct vhost_dev *dev) {
 static int vhost_user_progress_slave(struct vhost_user *u) {
     CharBackend *chr = u->user->chr;
     int r;
+    int timeout = 0;
 
     while (1) {
         /* get available bytes ready to read */
@@ -307,6 +308,10 @@ static int vhost_user_progress_slave(struct vhost_user *u) {
         if (vhost_for_each_device(vhost_dev_slave_read))
             continue; /* got slave message, no sleep */
         g_usleep(100);
+        if (++timeout > 30000) {
+            error_report("Read vq %d timeout", u->dev->vq_index);
+            return -1; /* timeout */
+        }
     }
     return 0;
 }
