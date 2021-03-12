@@ -1004,7 +1004,7 @@ static void slave_read(void *opaque)
 
     do {
         size = recvmsg(u->slave_fd, &msgh, 0);
-    } while (size < 0 && (errno == EINTR || errno == EAGAIN));
+    } while (size < 0 && errno == EINTR);
 
     if (size != VHOST_USER_HDR_SIZE) {
         error_report("Failed to read from slave.");
@@ -1036,7 +1036,7 @@ static void slave_read(void *opaque)
     /* Read payload */
     do {
         size = read(u->slave_fd, &payload, hdr.size);
-    } while (size < 0 && (errno == EINTR || errno == EAGAIN));
+    } while (size < 0 && errno == EINTR);
 
     if (size != hdr.size) {
         error_report("Failed to read payload from slave.");
@@ -1087,7 +1087,7 @@ static void slave_read(void *opaque)
 
         do {
             size = writev(u->slave_fd, iovec, ARRAY_SIZE(iovec));
-        } while (size < 0 && (errno == EINTR || errno == EAGAIN));
+        } while (size < 0 && errno == EINTR);
 
         if (size != VHOST_USER_HDR_SIZE + hdr.size) {
             error_report("Failed to send msg reply to slave.");
