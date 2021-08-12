@@ -475,7 +475,7 @@ static void object_finalize(void *data)
     object_property_del_all(obj);
     object_deinit(obj, ti);
 
-    // g_assert_cmpint(obj->ref, ==, 0);
+    g_assert_cmpint(obj->ref, ==, 0);
     if (obj->free) {
         obj->free(obj);
     }
@@ -917,7 +917,7 @@ void object_unref(Object *obj)
     if (!obj) {
         return;
     }
-    // g_assert_cmpint(obj->ref, >, 0);
+    g_assert_cmpint(obj->ref, >, 0);
 
     /* parent always holds a reference to its children */
     if (atomic_fetch_dec(&obj->ref) == 1) {
