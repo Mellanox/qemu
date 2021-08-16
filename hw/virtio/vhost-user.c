@@ -1470,6 +1470,7 @@ static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
     g_free(name);
 
     if (virtio_queue_set_host_notifier_mr(vdev, queue_idx, &n->mr, true)) {
+        object_unparent(OBJECT(&n->mr));
         munmap(addr, page_size);
         return -1;
     }
