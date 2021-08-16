@@ -2752,6 +2752,10 @@ static MemTxResult flatview_write_continue(FlatView *fv, hwaddr addr,
     for (;;) {
         if (!memory_access_is_direct(mr, true)) {
             release_lock |= prepare_mmio_access(mr);
+            if (release_lock && !__atomic_load_n(&mr->enabled, __ATOMIC_ACQUIRE)) {
+                qemu_mutex_unlock_iothread();
+                return MEMTX_ERROR;
+            }
             l = memory_access_size(mr, l, addr1);
             /* XXX: could force current_cpu to NULL to avoid
                potential bugs */
