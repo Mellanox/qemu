@@ -1061,6 +1061,8 @@ static int vhost_virtqueue_start(struct vhost_dev *dev,
         }
     }
 
+    virtio_queue_notify_vq(vvq);
+
     return 0;
 
 fail_vector:

@@ -1518,7 +1518,7 @@ static bool virtio_queue_notify_aio_vq(VirtQueue *vq)
     return false;
 }
 
-static void virtio_queue_notify_vq(VirtQueue *vq)
+void virtio_queue_notify_vq(VirtQueue *vq)
 {
     if (vq->vring.desc && vq->handle_output) {
         VirtIODevice *vdev = vq->vdev;
