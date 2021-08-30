@@ -1821,6 +1821,7 @@ void vhost_user_cleanup(VhostUserState *user)
 {
     int i;
 
+    memory_region_transaction_begin();
     for (i = 0; i < VIRTIO_QUEUE_MAX; i++) {
         if (user->notifier[i].addr) {
             object_unparent(OBJECT(&user->notifier[i].mr));
@@ -1828,6 +1829,7 @@ void vhost_user_cleanup(VhostUserState *user)
             user->notifier[i].addr = NULL;
         }
     }
+    memory_region_transaction_commit();
 }
 
 const VhostOps user_ops = {
