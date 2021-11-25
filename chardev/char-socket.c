@@ -489,8 +489,11 @@ static gboolean tcp_chr_hup(QIOChannel *channel,
 static int tcp_chr_peek(Chardev *chr)
 {
     SocketChardev *s = SOCKET_CHARDEV(chr);
-    QIOChannelClass *klass = QIO_CHANNEL_GET_CLASS(s->ioc);
+    QIOChannelClass *klass;
 
+    if (!s->ioc)
+        return -1;
+    klass = QIO_CHANNEL_GET_CLASS(s->ioc);
     return klass->io_peek(s->ioc, NULL);
 }
 
