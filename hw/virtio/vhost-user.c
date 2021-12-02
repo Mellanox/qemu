@@ -1490,7 +1490,6 @@ static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
     VirtIODevice *vdev = dev->vdev;
     VhostUserHostNotifier *n;
     void *addr;
-    char *name;
 
     if (!virtio_has_feature(dev->protocol_features,
                             VHOST_USER_PROTOCOL_F_HOST_NOTIFIER) ||
@@ -1517,15 +1516,12 @@ static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
         return -1;
     }
 
-    name = g_strdup_printf("vhost-user/host-notifier@%p mmaps[%d]",
-                           user, queue_idx);
     if (!n->mr.ram) { /* Don't init again after suspend. */
-        memory_region_init_ram_device_ptr(&n->mr, OBJECT(vdev), name,
+        memory_region_init_ram_device_ptr(&n->mr, OBJECT(vdev), NULL,
                                           page_size, addr);
     } else {
         n->mr.ram_block->host = addr;
     }
-    g_free(name);
 
     if (virtio_queue_set_host_notifier_mr(vdev, queue_idx, &n->mr, true)) {
         object_unparent(OBJECT(&n->mr));
