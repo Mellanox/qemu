@@ -1,0 +1,91 @@
+From f4cc1d28209c6773e643808a9d98bb961791eb51 Mon Sep 17 00:00:00 2001
+From: Xueming Li <xuemingl@nvidia.com>
+Date: Tue, 7 Sep 2021 15:42:25 +0800
+Subject: [PATCH v6 1/2] vhost-user: remove VirtQ notifier restore
+To: qemu-devel@nongnu.org
+Cc: xuemingl@nvidia.com,
+    qemu-stable@nongnu.org
+
+When vhost-user vdpa client suspend, backend may close all resources,
+VQ notifier mmap address become invalid, restore MR which contains
+the invalid address is wrong. vdpa client will set VQ notifier after
+reconnect.
+
+This patch removes VQ notifier restore and related flags to avoid reusing
+invalid address.
+
+Fixes: 44866521bd6e ("vhost-user: support registering external host notifiers")
+Cc: qemu-stable@nongnu.org
+Cc: Yuwei Zhang <zhangyuwei.9149@bytedance.com>
+Signed-off-by: Xueming Li <xuemingl@nvidia.com>
+---
+ hw/virtio/vhost-user.c         | 19 +------------------
+ include/hw/virtio/vhost-user.h |  1 -
+ 2 files changed, 1 insertion(+), 19 deletions(-)
+
+diff --git a/hw/virtio/vhost-user.c b/hw/virtio/vhost-user.c
+index bf6e50223c..c671719e9b 100644
+--- a/hw/virtio/vhost-user.c
++++ b/hw/virtio/vhost-user.c
+@@ -1143,19 +1143,6 @@ static int vhost_user_set_vring_num(struct vhost_dev *dev,
+     return vhost_set_vring(dev, VHOST_USER_SET_VRING_NUM, ring);
+ }
+ 
+-static void vhost_user_host_notifier_restore(struct vhost_dev *dev,
+-                                             int queue_idx)
+-{
+-    struct vhost_user *u = dev->opaque;
+-    VhostUserHostNotifier *n = &u->user->notifier[queue_idx];
+-    VirtIODevice *vdev = dev->vdev;
+-
+-    if (n->addr && !n->set) {
+-        virtio_queue_set_host_notifier_mr(vdev, queue_idx, &n->mr, true);
+-        n->set = true;
+-    }
+-}
+-
+ static void vhost_user_host_notifier_remove(struct vhost_dev *dev,
+                                             int queue_idx)
+ {
+@@ -1163,17 +1150,14 @@ static void vhost_user_host_notifier_remove(struct vhost_dev *dev,
+     VhostUserHostNotifier *n = &u->user->notifier[queue_idx];
+     VirtIODevice *vdev = dev->vdev;
+ 
+-    if (n->addr && n->set) {
++    if (n->addr) {
+         virtio_queue_set_host_notifier_mr(vdev, queue_idx, &n->mr, false);
+-        n->set = false;
+     }
+ }
+ 
+ static int vhost_user_set_vring_base(struct vhost_dev *dev,
+                                      struct vhost_vring_state *ring)
+ {
+-    vhost_user_host_notifier_restore(dev, ring->index);
+-
+     return vhost_set_vring(dev, VHOST_USER_SET_VRING_BASE, ring);
+ }
+ 
+@@ -1538,7 +1522,6 @@ static int vhost_user_slave_handle_vring_host_notifier(struct vhost_dev *dev,
+     }
+ 
+     n->addr = addr;
+-    n->set = true;
+ 
+     return 0;
+ }
+diff --git a/include/hw/virtio/vhost-user.h b/include/hw/virtio/vhost-user.h
+index a9abca3288..f6012b2078 100644
+--- a/include/hw/virtio/vhost-user.h
++++ b/include/hw/virtio/vhost-user.h
+@@ -14,7 +14,6 @@
+ typedef struct VhostUserHostNotifier {
+     MemoryRegion mr;
+     void *addr;
+-    bool set;
+ } VhostUserHostNotifier;
+ 
+ typedef struct VhostUserState {
+-- 
+2.33.0
+
