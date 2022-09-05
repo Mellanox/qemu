@@ -104,7 +104,7 @@ static int vhost_user_blk_handle_config_change(struct vhost_dev *dev)
     }
 
     /* valid for resize only */
-    if (blkcfg.capacity != s->blkcfg.capacity) {
+    if (s && blkcfg.capacity != s->blkcfg.capacity) {
         s->blkcfg.capacity = blkcfg.capacity;
         memcpy(dev->vdev->config, &s->blkcfg, sizeof(struct virtio_blk_config));
         virtio_notify_config(dev->vdev);
@@ -401,7 +401,7 @@ static void vhost_user_blk_event(void *opaque, QEMUChrEvent event)
         }
         break;
     case CHR_EVENT_CLOSED:
-        if (!runstate_check(RUN_STATE_SHUTDOWN)) {
+        if (!runstate_check(RUN_STATE_SHUTDOWN) && !runstate_check(RUN_STATE_POSTMIGRATE)) {
             /*
              * A close event may happen during a read/write, but vhost
              * code assumes the vhost_dev remains setup, so delay the
