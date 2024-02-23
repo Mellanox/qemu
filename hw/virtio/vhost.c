@@ -1989,7 +1989,7 @@ static int vhost_dev_set_vring_enable(struct vhost_dev *hdev, int enable)
     return hdev->vhost_ops->vhost_set_vring_enable(hdev, enable);
 }
 
-int vhost_dev_presetup(struct vhost_dev *hdev, VirtIODevice *vdev)
+int vhost_dev_presetup(struct vhost_dev *hdev, VirtIODevice *vdev, bool vrings)
 {
     int i, r;
 
@@ -2020,6 +2020,12 @@ int vhost_dev_presetup(struct vhost_dev *hdev, VirtIODevice *vdev)
                                            hdev->vq_index + i);
         if (r < 0) {
             return r;
+        }
+        if (vrings) {
+            r = vhost_dev_set_vring_enable(hdev, true);
+            if (r < 0) {
+                return r;
+            }
         }
     }
 

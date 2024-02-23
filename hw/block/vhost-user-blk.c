@@ -433,6 +433,51 @@ static int vhost_user_blk_realize_connect(VHostUserBlk *s, Error **errp)
     return 0;
 }
 
+static int vhost_user_blk_early_setup(void *opaque, int version_id)
+{
+    VHostUserBlk *s = opaque;
+    VirtIODevice *vdev = VIRTIO_DEVICE(s);
+    int r;
+
+    s->dev.acked_features = vdev->guest_features;
+    s->dev.vq_index_end = s->dev.nvqs;
+
+    /* backend should support presetup */
+    r = vhost_dev_set_presetup_state(&s->dev, true);
+    if (r < 0) {
+        error_report("Start presetup device fail: %d", r);
+        goto error;
+    }
+
+    r = vhost_dev_presetup(&s->dev, vdev, true);
+    if (r < 0) {
+        error_report("Presetup device fail: %d", r);
+        goto error;
+    }
+
+    r = vhost_dev_set_presetup_state(&s->dev, false);
+    if (r < 0) {
+        error_report("Finish presetup device fail: %d", r);
+        return r;
+    }
+    return r;
+error:
+    vhost_dev_set_presetup_state(&s->dev, false);
+    return r;
+}
+
+static const VMStateDescription vmstate_vhost_user_blk_early = {
+    .name = "vhost-user-blk-early",
+    .minimum_version_id = 1,
+    .version_id = 1,
+    .fields = (VMStateField[]) {
+        VMSTATE_EARLY_VIRTIO_DEVICE,
+        VMSTATE_END_OF_LIST()
+    },
+    .early_setup = true,
+    .post_load = vhost_user_blk_early_setup,
+};
+
 static void vhost_user_blk_device_realize(DeviceState *dev, Error **errp)
 {
     ERRP_GUARD();
@@ -501,6 +546,10 @@ static void vhost_user_blk_device_realize(DeviceState *dev, Error **errp)
     qemu_chr_fe_set_handlers(&s->chardev,  NULL, NULL,
                              vhost_user_blk_event, NULL, (void *)dev,
                              NULL, true);
+    if (s->early_migration) {
+        vmstate_register(NULL, VMSTATE_INSTANCE_ID_ANY,
+                         &vmstate_vhost_user_blk_early, s);
+    }
     return;
 
 virtio_err:
@@ -575,6 +624,8 @@ static Property vhost_user_blk_properties[] = {
                       VIRTIO_BLK_F_DISCARD, true),
     DEFINE_PROP_BIT64("write-zeroes", VHostUserBlk, parent_obj.host_features,
                       VIRTIO_BLK_F_WRITE_ZEROES, true),
+    DEFINE_PROP_BOOL("x-early-migration", VHostUserBlk,
+                     early_migration, false),
     DEFINE_PROP_END_OF_LIST(),
 };
 

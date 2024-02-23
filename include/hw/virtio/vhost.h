@@ -196,12 +196,13 @@ void vhost_config_mask(struct vhost_dev *hdev, VirtIODevice *vdev, bool mask);
  * vhost_dev_presetup() - pre-setup the vhost device in LM
  * @hdev: common vhost_dev structure
  * @vdev: the VirtIODevice structure
+ * @vrings: if enable vring
  *
  * During live migration, send out device information to backend in early
  * running state. Backend can have enough time to prepare HW.
  * Return: 0 on success, < 0 on error.
  */
-int vhost_dev_presetup(struct vhost_dev *hdev, VirtIODevice *vdev);
+int vhost_dev_presetup(struct vhost_dev *hdev, VirtIODevice *vdev, bool vrings);
 
 /**
  * vhost_dev_is_started() - report status of vhost device

@@ -368,17 +368,9 @@ int vhost_net_presetup(VirtIODevice *dev, NetClientState *ncs,
         net = get_vhost_net(peer);
         vhost_net_set_vq_index(net, i * 2, index_end);
 
-        r = vhost_dev_presetup(&net->dev, dev);
+        r = vhost_dev_presetup(&net->dev, dev, peer->vring_enable);
         if (r < 0) {
             return r;
-        }
-
-        if (peer->vring_enable) {
-            /* restore vring enable state */
-            r = vhost_set_vring_enable(peer, peer->vring_enable);
-            if (r < 0) {
-                return r;
-            }
         }
     }
 
