@@ -2909,9 +2909,15 @@ static void virtio_net_tx_bh(void *opaque)
 static void virtio_net_add_queue(VirtIONet *n, int index)
 {
     VirtIODevice *vdev = VIRTIO_DEVICE(n);
+    NetClientState *nc = qemu_get_subqueue(n->nic, index);
 
-    n->vqs[index].rx_vq = virtio_add_queue(vdev, n->net_conf.rx_queue_size,
-                                           virtio_net_handle_rx);
+    if (nc->peer && nc->peer->info->type == NET_CLIENT_DRIVER_VHOST_USER) {
+        n->vqs[index].rx_vq = virtio_add_queue(vdev, n->net_conf.rx_queue_size,
+                                               NULL);
+    } else {
+        n->vqs[index].rx_vq = virtio_add_queue(vdev, n->net_conf.rx_queue_size,
+                                               virtio_net_handle_rx);
+    }
 
     if (n->net_conf.tx && !strcmp(n->net_conf.tx, "timer")) {
         n->vqs[index].tx_vq =
@@ -2921,11 +2927,17 @@ static void virtio_net_add_queue(VirtIONet *n, int index)
                                               virtio_net_tx_timer,
                                               &n->vqs[index]);
     } else {
-        n->vqs[index].tx_vq =
-            virtio_add_queue(vdev, n->net_conf.tx_queue_size,
-                             virtio_net_handle_tx_bh);
-        n->vqs[index].tx_bh = qemu_bh_new_guarded(virtio_net_tx_bh, &n->vqs[index],
-                                                  &DEVICE(vdev)->mem_reentrancy_guard);
+        if (nc->peer && nc->peer->info->type == NET_CLIENT_DRIVER_VHOST_USER) {
+            n->vqs[index].tx_vq =
+                virtio_add_queue(vdev, n->net_conf.tx_queue_size,
+                                 NULL);
+        } else {
+            n->vqs[index].tx_vq =
+                virtio_add_queue(vdev, n->net_conf.tx_queue_size,
+                                 virtio_net_handle_tx_bh);
+            n->vqs[index].tx_bh = qemu_bh_new_guarded(virtio_net_tx_bh, &n->vqs[index],
+                                                      &DEVICE(vdev)->mem_reentrancy_guard);
+        }
     }
 
     n->vqs[index].tx_waiting = 0;
@@ -3771,6 +3783,17 @@ static void virtio_net_device_realize(DeviceState *dev, Error **errp)
     n->net_conf.tx_queue_size = MIN(virtio_net_max_tx_queue_size(n),
                                     n->net_conf.tx_queue_size);
 
+    if (n->netclient_type) {
+        /*
+         * Happen when virtio_net_set_netclient_name has been called.
+         */
+        n->nic = qemu_new_nic(&net_virtio_info, &n->nic_conf,
+                              n->netclient_type, n->netclient_name, n);
+    } else {
+        n->nic = qemu_new_nic(&net_virtio_info, &n->nic_conf,
+                              object_get_typename(OBJECT(dev)), dev->id, n);
+    }
+
     for (i = 0; i < n->max_queue_pairs; i++) {
         virtio_net_add_queue(n, i);
     }
@@ -3783,17 +3806,6 @@ static void virtio_net_device_realize(DeviceState *dev, Error **errp)
                               QEMU_CLOCK_VIRTUAL,
                               virtio_net_announce_timer, n);
     n->announce_timer.round = 0;
-
-    if (n->netclient_type) {
-        /*
-         * Happen when virtio_net_set_netclient_name has been called.
-         */
-        n->nic = qemu_new_nic(&net_virtio_info, &n->nic_conf,
-                              n->netclient_type, n->netclient_name, n);
-    } else {
-        n->nic = qemu_new_nic(&net_virtio_info, &n->nic_conf,
-                              object_get_typename(OBJECT(dev)), dev->id, n);
-    }
 
     for (i = 0; i < n->max_queue_pairs; i++) {
         n->nic->ncs[i].do_not_pad = true;
