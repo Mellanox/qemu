@@ -417,13 +417,13 @@ static void virtio_net_set_status(struct VirtIODevice *vdev, uint8_t status)
             if (q->tx_timer) {
                 timer_mod(q->tx_timer,
                                qemu_clock_get_ns(QEMU_CLOCK_VIRTUAL) + n->tx_timeout);
-            } else {
+            } else if (q->tx_bh) {
                 qemu_bh_schedule(q->tx_bh);
             }
         } else {
             if (q->tx_timer) {
                 timer_del(q->tx_timer);
-            } else {
+            } else if (q->tx_bh) {
                 qemu_bh_cancel(q->tx_bh);
             }
             if ((n->status & VIRTIO_NET_S_LINK_UP) == 0 &&
