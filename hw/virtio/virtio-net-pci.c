@@ -59,6 +59,15 @@ static void virtio_net_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
             + 1 /* Control vq */;
     }
 
+    if (vpci_dev->flags & VIRTIO_PCI_FLAG_QUEUE_NOFFSET_ZERO) {
+        if (vpci_dev->flags & VIRTIO_PCI_FLAG_PAGE_PER_VQ) {
+            vpci_dev->nvqs_fixed_noff = 2 * MAX(net->nic_conf.peers.queues, 1);
+        } else {
+            warn_report("vq-noffset-zero can't be set without page-per-vq");
+            vpci_dev->flags &= ~VIRTIO_PCI_FLAG_QUEUE_NOFFSET_ZERO;
+        }
+    }
+
     virtio_net_set_netclient_name(&dev->vdev, qdev->id,
                                   object_get_typename(OBJECT(qdev)));
     qdev_realize(vdev, BUS(&vpci_dev->bus), errp);

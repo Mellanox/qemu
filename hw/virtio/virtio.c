@@ -3590,6 +3590,17 @@ int virtio_queue_set_host_notifier_mr(VirtIODevice *vdev, int n,
     return -1;
 }
 
+bool virtio_queue_require_host_notifier_mr(VirtIODevice *vdev, int n)
+{
+    BusState *qbus = qdev_get_parent_bus(DEVICE(vdev));
+    VirtioBusClass *k = VIRTIO_BUS_GET_CLASS(qbus);
+
+    if (k->host_notifier_mr_needed) {
+        return k->host_notifier_mr_needed(qbus->parent, n);
+    }
+    return true;
+}
+
 void virtio_device_set_child_bus_name(VirtIODevice *vdev, char *bus_name)
 {
     g_free(vdev->bus_name);

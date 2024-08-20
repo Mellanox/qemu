@@ -63,6 +63,15 @@ static void vhost_user_blk_pci_realize(VirtIOPCIProxy *vpci_dev, Error **errp)
         vpci_dev->nvectors = dev->vdev.num_queues + 1;
     }
 
+    if (vpci_dev->flags & VIRTIO_PCI_FLAG_QUEUE_NOFFSET_ZERO) {
+        if (vpci_dev->flags & VIRTIO_PCI_FLAG_PAGE_PER_VQ) {
+            vpci_dev->nvqs_fixed_noff = dev->vdev.num_queues;
+        } else {
+            warn_report("vq-noffset-zero can't be set without page-per-vq");
+            vpci_dev->flags &= ~VIRTIO_PCI_FLAG_QUEUE_NOFFSET_ZERO;
+        }
+    }
+
     qdev_realize(vdev, BUS(&vpci_dev->bus), errp);
 }
 

@@ -1252,6 +1252,17 @@ assign_error:
     return r;
 }
 
+static bool virtio_pci_host_notifier_mr_needed(DeviceState *d, int n)
+{
+    VirtIOPCIProxy *proxy = VIRTIO_PCI(d);
+
+    if (proxy->flags & VIRTIO_PCI_FLAG_QUEUE_NOFFSET_ZERO && n != 0) {
+        return false;
+    }
+
+    return true;
+}
+
 static int virtio_pci_set_host_notifier_mr(DeviceState *d, int n,
                                            MemoryRegion *mr, bool assign)
 {
@@ -1260,6 +1271,10 @@ static int virtio_pci_set_host_notifier_mr(DeviceState *d, int n,
 
     if (n >= VIRTIO_QUEUE_MAX || !virtio_pci_modern(proxy) ||
         virtio_pci_queue_mem_mult(proxy) != memory_region_size(mr)) {
+        return -1;
+    }
+
+    if (!virtio_pci_host_notifier_mr_needed(d, n)) {
         return -1;
     }
 
@@ -1416,8 +1431,13 @@ static uint64_t virtio_pci_common_read(void *opaque, hwaddr addr,
         val = proxy->vqs[vdev->queue_sel].enabled;
         break;
     case VIRTIO_PCI_COMMON_Q_NOFF:
-        /* Simply map queues in order */
-        val = vdev->queue_sel;
+        /* Net CVQ still needs a separated notify offset */
+        if (proxy->nvqs_fixed_noff && vdev->queue_sel < proxy->nvqs_fixed_noff) {
+            val = 0;
+        } else {
+            /* Simply map queues in order */
+            val = vdev->queue_sel;
+        }
         break;
     case VIRTIO_PCI_COMMON_Q_DESCLO:
         val = proxy->vqs[vdev->queue_sel].desc[0];
@@ -2218,6 +2238,8 @@ static Property virtio_pci_properties[] = {
                     VIRTIO_PCI_FLAG_INIT_FLR_BIT, true),
     DEFINE_PROP_BIT("aer", VirtIOPCIProxy, flags,
                     VIRTIO_PCI_FLAG_AER_BIT, false),
+    DEFINE_PROP_BIT("vq-noffset-zero", VirtIOPCIProxy, flags,
+                    VIRTIO_PCI_FLAG_QUEUE_NOFFSET_ZERO_BIT, false),
     DEFINE_PROP_END_OF_LIST(),
 };
 
@@ -2447,6 +2469,7 @@ static void virtio_pci_bus_class_init(ObjectClass *klass, void *data)
     k->get_dma_as = virtio_pci_get_dma_as;
     k->iommu_enabled = virtio_pci_iommu_enabled;
     k->queue_enabled = virtio_pci_queue_enabled;
+    k->host_notifier_mr_needed = virtio_pci_host_notifier_mr_needed;
 }
 
 static const TypeInfo virtio_pci_bus_info = {

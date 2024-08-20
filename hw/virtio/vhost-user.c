@@ -1566,6 +1566,10 @@ static int vhost_user_backend_handle_vring_host_notifier(struct vhost_dev *dev,
         return -EINVAL;
     }
 
+    if (!virtio_queue_require_host_notifier_mr(vdev, queue_idx)) {
+        return 0;
+    }
+
     /*
      * Fetch notifier and invalidate any old data before setting up
      * new mapped address.

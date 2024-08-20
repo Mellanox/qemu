@@ -94,6 +94,8 @@ struct VirtioBusClass {
     bool has_variable_vring_alignment;
     AddressSpace *(*get_dma_as)(DeviceState *d);
     bool (*iommu_enabled)(DeviceState *d);
+    /* Whether the queue external host notifier mr is needed */
+    bool (*host_notifier_mr_needed)(DeviceState *d, int n);
 };
 
 struct VirtioBusState {

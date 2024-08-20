@@ -43,6 +43,7 @@ enum {
     VIRTIO_PCI_FLAG_INIT_FLR_BIT,
     VIRTIO_PCI_FLAG_AER_BIT,
     VIRTIO_PCI_FLAG_ATS_PAGE_ALIGNED_BIT,
+    VIRTIO_PCI_FLAG_QUEUE_NOFFSET_ZERO_BIT,
 };
 
 /* Need to activate work-arounds for buggy guests at vmstate load. */
@@ -88,6 +89,10 @@ enum {
 /* Page Aligned Address space Translation Service */
 #define VIRTIO_PCI_FLAG_ATS_PAGE_ALIGNED \
   (1 << VIRTIO_PCI_FLAG_ATS_PAGE_ALIGNED_BIT)
+
+/* Queue notify offset fixed to 0 */
+#define VIRTIO_PCI_FLAG_QUEUE_NOFFSET_ZERO \
+  (1 << VIRTIO_PCI_FLAG_QUEUE_NOFFSET_ZERO_BIT)
 
 typedef struct {
     MSIMessage msg;
@@ -163,6 +168,7 @@ struct VirtIOPCIProxy {
     VirtIOIRQFD *vector_irqfd;
     int nvqs_with_notifiers;
     VirtioBusState bus;
+    int nvqs_fixed_noff;
 };
 
 static inline bool virtio_pci_modern(VirtIOPCIProxy *proxy)
