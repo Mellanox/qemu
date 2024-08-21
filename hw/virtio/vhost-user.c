@@ -55,6 +55,7 @@
  * Maximum size of virtio device config space
  */
 #define VHOST_USER_MAX_CONFIG_SIZE 256
+#define VIRTIO_CONFIG_S_EXTEND_NOTIFY_VQ0   0x100
 
 enum VhostUserProtocolFeature {
     VHOST_USER_PROTOCOL_F_MQ = 0,
@@ -76,6 +77,7 @@ enum VhostUserProtocolFeature {
     VHOST_USER_PROTOCOL_F_STATUS = 16,
     /* Feature 17 reserved for VHOST_USER_PROTOCOL_F_XEN_MMAP. */
     VHOST_USER_PROTOCOL_F_PRESETUP = 18,
+    VHOST_USER_PROTOCOL_F_EXTEND_STATUS = 19,
     VHOST_USER_PROTOCOL_F_MAX
 };
 
@@ -1395,12 +1397,12 @@ static int vhost_user_set_u64(struct vhost_dev *dev, int request, uint64_t u64,
     return 0;
 }
 
-static int vhost_user_set_status(struct vhost_dev *dev, uint8_t status)
+static int vhost_user_set_status(struct vhost_dev *dev, uint64_t status)
 {
     return vhost_user_set_u64(dev, VHOST_USER_SET_STATUS, status, false);
 }
 
-static int vhost_user_get_status(struct vhost_dev *dev, uint8_t *status)
+static int vhost_user_get_status(struct vhost_dev *dev, uint64_t *status)
 {
     uint64_t value;
     int ret;
@@ -1414,9 +1416,9 @@ static int vhost_user_get_status(struct vhost_dev *dev, uint8_t *status)
     return 0;
 }
 
-static int vhost_user_add_status(struct vhost_dev *dev, uint8_t status)
+static int vhost_user_add_status(struct vhost_dev *dev, uint64_t status)
 {
-    uint8_t s;
+    uint64_t s;
     int ret;
 
     ret = vhost_user_get_status(dev, &s);
@@ -2713,6 +2715,9 @@ void vhost_user_async_close(DeviceState *d,
 
 static int vhost_user_dev_start(struct vhost_dev *dev, bool started)
 {
+    VirtIODevice *vdev = dev->vdev;
+    uint64_t status;
+
     if (!virtio_has_feature(dev->protocol_features,
                             VHOST_USER_PROTOCOL_F_STATUS)) {
         return 0;
@@ -2724,12 +2729,25 @@ static int vhost_user_dev_start(struct vhost_dev *dev, bool started)
     }
 
     if (started) {
-        return vhost_user_add_status(dev, VIRTIO_CONFIG_S_ACKNOWLEDGE |
-                                          VIRTIO_CONFIG_S_DRIVER |
-                                          VIRTIO_CONFIG_S_DRIVER_OK);
-    } else {
-        return 0;
+
+        if (!virtio_has_feature(dev->protocol_features,
+                    VHOST_USER_PROTOCOL_F_STATUS)) {
+            return 0;
+        }
+
+        status = VIRTIO_CONFIG_S_ACKNOWLEDGE |
+            VIRTIO_CONFIG_S_DRIVER |
+            VIRTIO_CONFIG_S_DRIVER_OK;
+
+        if (virtio_has_feature(dev->protocol_features,
+                    VHOST_USER_PROTOCOL_F_EXTEND_STATUS) &&
+            !virtio_queue_require_host_notifier_mr(vdev, 1)) {
+            status |= VIRTIO_CONFIG_S_EXTEND_NOTIFY_VQ0;
+        }
+        return vhost_user_add_status(dev, status);
     }
+
+    return 0;
 }
 
 static void vhost_user_reset_status(struct vhost_dev *dev)
